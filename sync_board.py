@@ -6,7 +6,6 @@ from binascii import crc32, a2b_hex, b2a_hex, hexlify
 import socket
 from os import path
 import struct
-import time
 
 
 def make_tlv(tag, val):
@@ -132,6 +131,7 @@ class Command(cmd.Cmd):
             print('restart - перезапуск платы')
             print('factory - чтение/запись заводских настроек')
             print('ptp - чтение состояния PTP')
+            print('tlv - send TLV')
         elif len(rest) == 1:
             cmd  = rest[0]
             if cmd == 'devmode':
@@ -173,6 +173,8 @@ class Command(cmd.Cmd):
                 print('factory ([r] | w <serial number>)')
             elif cmd == 'ptp':
                 print('ptp')
+            elif cmd == 'tlv':
+                print('tlv <tag> [<data>]')
 
     def _modes(self):
         arr = []
@@ -208,7 +210,7 @@ class Command(cmd.Cmd):
         if v >= 0 and v < len(self.modes):
             return self.modes[v]
         elif v == 254:
-            return 'service'
+            return 'service (BIOS)'
         elif v == 255:
             return 'firmware upgrade'
         else:
@@ -288,21 +290,28 @@ class Command(cmd.Cmd):
             sz = path.getsize(rest)
             if sz != 768 * 1024:
                 raise MyException('Bad file size:' + sz)
-            tag, value = self._send_tlv(bytes([0xF5]), bytes([0]))
-            if tag[0] != 0xF5:
+            print('read device mode ...')
+            tag, value = self._send_tlv(bytes([0xC7]), bytes())
+            if tag[0] != 0xC7:
                 raise MyException('Read deviceMode failed!')
-            if value[0] == 0xFE:
+            mod = int(value[0])
+            if mod == 0xFF:
+                raise MyException('The device is already in firmware update mode!')
+            if mod == 0xFE:
                 # service mode
+                print('clear all firmware ...')
                 tag, value = self._send_tlv(bytes([0xF4]), bytes([0]))
                 if tag[0] != 0xF4 or value[0] != 1:
                     raise MyException('Clear all firmware failed!')
                 self._send_tlv(bytes([0xF3]), bytes([0]))
 
             # reset last upgrade
+            print('clear last firmware ...')
             tag, value = self._send_tlv(bytes([0xF1]), bytes([0]))
             if tag[0] != 0xF1 or value[0] != 1:
                 raise MyException('Reset firmware failed!')
             i = 0
+            print('write firmware ...')
             with open(rest, 'rb') as fw:
                 buf = fw.read(1024)
                 while buf:
@@ -313,13 +322,16 @@ class Command(cmd.Cmd):
                     print(i)
                     i += 1
 
-                tag, value = self._send_tlv(bytes([0xF3]), bytes([0]))
+            print('reset device ...')
+            tag, value = self._send_tlv(bytes([0xF3]), bytes([0]))
 
         except FileNotFoundError as e:
             print(e)
         except MyException as e:
             print(e)
             self._reopen_socket()
+        except (ValueError or IndexError) as e:
+            print(e)
         except socket.timeout:
             print('*** timeout')
 
@@ -369,7 +381,7 @@ class Command(cmd.Cmd):
                     print('Status: ({}) {}'.format(st, self.status_names[st]))
                 except IndexError:
                     print('Status: ({}) {}'.format(st, 'unknown'))
-                print('running time: {} c'.format(wt))
+                print('running time: {} s'.format(wt))
 
             except socket.timeout:
                 print('*** timeout')
@@ -683,7 +695,7 @@ class Command(cmd.Cmd):
                 try:
                     print('serial: ', struct.unpack('<H', value[:2])[0])
                     print('ver.: {}.{}.{}'.format(value[2], value[3], value[4]))
-                    print('build: {}'.format(struct.unpack('<I', value[5:9])))
+                    print('build: {}'.format(struct.unpack('<I', value[5:9])[0]))
                     print('cur block: ({}) {}'.format(value[9], blk_nm[value[9]]))
                     print('info string: ', value[10:].decode())
 
