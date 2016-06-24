@@ -503,7 +503,7 @@ class Command(cmd.Cmd):
             except ValueError as e:
                 print('wrong parameter:', e)
 
-            if num not in range(1, 4):
+            if num not in range(1, 5):
                 print('wrong number: ', num)
                 return
 
@@ -530,9 +530,9 @@ class Command(cmd.Cmd):
                 freq = float(rest[3])
                 dur = float(rest[4])
                 delay = float(rest[5])
-                if num not in range(1, 4):
+                if num not in range(1, 5):
                     raise ValueError(num)
-                if mod not in range(1, len(mode)):
+                if mod not in range(0, len(mode)):
                     raise ValueError(mod)
                 if freq < 0.:
                     raise ValueError(freq)
