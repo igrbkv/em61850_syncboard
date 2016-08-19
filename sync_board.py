@@ -676,6 +676,8 @@ class Command(cmd.Cmd):
                 tag, value = self._send_tlv(bytes([0xB7]), data)
                 self._print_result(tag, value)
 
+                tag, value = self._send_tlv(bytes([0xF3]), bytes([0x0]))
+
             except socket.timeout:
                 print('*** timeout')
 
@@ -711,10 +713,9 @@ class Command(cmd.Cmd):
         restart
         '''
         rest = rest.split()
-        data = bytearray()
         if not rest:
             try:
-                tag, value = self._send_tlv(bytes([0xF3]), data)
+                tag, value = self._send_tlv(bytes([0xF3]), bytes([0x0]))
                 self._print_result(tag, value)
             except socket.timeout:
                 print('*** timeout')
